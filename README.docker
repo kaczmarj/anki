@@ -1,0 +1,27 @@
+# Anki in Docker
+
+Docker provides a standard method of installing software. This is particularly helpful when software requires a complex set of dependencies, like Anki.
+
+## Developing Anki in Docker
+
+Build your local source tree in Docker.
+
+1. Build the Docker image with build-time dependencies. The Anki Dockerfile uses multi-stage builds, so the target is the first stage, which includes only the dependencies.
+
+```
+docker build --tag anki:dependencies --target dependencies .
+```
+
+2. Compile your source tree
+
+Important to run as the current user. Find user id with `id -u` and group ID with `id -g`. If this is not done, files will be owned by root.
+
+```
+docker run --rm -it --name ankibuilder --detach --volume $PWD:/work --workdir /work --user 1000:1000 anki:dependencies bash
+```
+
+Compile the code here.
+
+```
+docker exec -it ankibuilder make develop
+```
