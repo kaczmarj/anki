@@ -1,15 +1,23 @@
-FROM python:3.8 AS builder
+FROM python:3.8 AS dependencies
 
 ARG DEBIAN_FRONTEND="noninteractive"
+
+# Allow non-root users to install things and modify installations in /opt.
+RUN chmod 777 /opt && chmod a+s /opt
 
 # Install rust.
 ENV CARGO_HOME="/opt/cargo" \
     RUSTUP_HOME="/opt/rustup"
 ENV PATH="$CARGO_HOME/bin:$PATH"
-RUN curl -fsSL --proto '=https' --tlsv1.2 https://sh.rustup.rs \
+RUN mkdir $CARGO_HOME $RUSTUP_HOME \
+    && chmod -R a+s $CARGO_HOME $RUSTUP_HOME \
+    && curl -fsSL --proto '=https' --tlsv1.2 https://sh.rustup.rs \
     | sh -s -- -y --quiet --no-modify-path \
     && rustup update \
-    && cargo install ripgrep
+    && cargo install ripgrep \
+    # Allow non-root users to install toolchains and update rust crates.
+    && chmod 777 $RUSTUP_HOME/toolchains $RUSTUP_HOME/update-hashes $CARGO_HOME/registry \
+    && chmod -R a+rw $CARGO_HOME/registry
 
 # Install system dependencies.
 RUN apt-get update \
@@ -34,7 +42,12 @@ RUN curl -fsSL --proto '=https' -O https://github.com/protocolbuffers/protobuf/r
     && rm protoc-3.11.4-linux-x86_64.zip
 ENV PATH="/opt/protoc/bin:$PATH"
 
-# Build anki.
+RUN chmod 777 $RUSTUP_HOME \
+    && chmod 777 $CARGO_HOME
+
+# Build anki. Use a separate image so users can build an image with build-time
+# dependencies.
+FROM dependencies AS builder
 WORKDIR /opt/anki
 COPY . .
 RUN make develop \
