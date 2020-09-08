@@ -1,6 +1,6 @@
-FROM python:3.8 AS dependencies
+ARG PYTHON_VERSION="3.8"
 
-ARG DEBIAN_FRONTEND="noninteractive"
+FROM python:$PYTHON_VERSION AS dependencies
 
 # Allow non-root users to install things and modify installations in /opt.
 RUN chmod 777 /opt && chmod a+s /opt
@@ -60,11 +60,13 @@ RUN chmod 777 $RUSTUP_HOME/toolchains $RUSTUP_HOME/update-hashes $CARGO_HOME/reg
 FROM dependencies AS builder
 WORKDIR /opt/anki
 COPY . .
-RUN make develop \
-    && make build
+RUN make develop
+
+FROM builder AS pythonbuilder
+RUN make build
 
 # Build final image.
-FROM python:3.8-slim
+FROM python:${PYTHON_VERSION}-slim
 
 # Install system dependencies.
 RUN apt-get update \
@@ -87,7 +89,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pre-compiled Anki.
-COPY --from=builder /opt/anki/dist/ /opt/anki/
+COPY --from=pythonbuilder /opt/anki/dist/ /opt/anki/
 RUN python -m pip install --no-cache-dir \
         PyQtWebEngine \
         /opt/anki/*.whl \
